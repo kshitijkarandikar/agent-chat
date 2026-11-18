@@ -1,0 +1,15 @@
+{
+  "name": "agent-chat",
+  "version": "0.2.0",
+  "description": "Your own AI agent: a small local app with tools, skills and MCP connections.",
+  "type": "module",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {}
+}

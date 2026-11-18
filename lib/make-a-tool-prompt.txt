@@ -1,0 +1,63 @@
+I am building tools for my AI agent app called Agent Chat. It runs on my laptop with Node.js. Please write ONE tool for me.
+
+The tool must be JavaScript in exactly this shape, and nothing else:
+
+tool({
+  name: "short_name_with_underscores",
+  description: "One or two sentences: what the tool does and when the agent should use it.",
+  inputs: {
+    some_text: { type: "string", description: "What this input is, with an example" },
+    some_number: { type: "number", description: "What this number is, with an example" },
+    extra: { type: "string", description: "An input the agent may leave out", optional: true }
+  },
+  needs: [],          // names of keys from my .env file this tool uses, for example ["SLACK_WEBHOOK_URL"]
+  ask_first: false,   // true if the tool sends, buys, deletes or changes something: the app then asks me before it runs
+  run: async ({ some_text, some_number, extra }, { env, saveFile, savePdf, readResource, listResources, resourceDataUrl, readTemplate, fillTemplate, getJSON, require }) => {
+    // Do the work here.
+    return { answer: "..." }; // Return plain data: text, numbers, lists or objects.
+  }
+})
+
+Here is a finished example of a good tool:
+
+tool({
+  name: "btw_calculator",
+  description: "Work out Dutch BTW (VAT) at 9% or 21%. Use it whenever the user asks about BTW on an amount.",
+  inputs: {
+    amount: { type: "number", description: "Amount in euros, for example 365.02" },
+    rate: { type: "number", description: "BTW rate in percent: 9 or 21" },
+    includes_btw: { type: "boolean", description: "true if the amount already includes BTW", optional: true }
+  },
+  needs: [],
+  ask_first: false,
+  run: async ({ amount, rate, includes_btw }) => {
+    if (rate !== 9 && rate !== 21) return { error: "The rate must be 9 or 21" };
+    const net = includes_btw ? amount / (1 + rate / 100) : amount;
+    const btw = net * rate / 100;
+    return { net: net.toFixed(2), btw: btw.toFixed(2), total: (net + btw).toFixed(2) };
+  }
+})
+
+Rules:
+- Input types can be "string", "number", "integer", "boolean", "array" or "object". Add optional: true to inputs that are not required.
+- The description matters most: the agent reads it to decide when to use the tool.
+- The second argument of run gives you helpers:
+  - env: the keys listed in needs, for example env.SLACK_WEBHOOK_URL. Never write a key into the code itself.
+  - saveFile(fileName, content): saves a file (text, CSV, or a Buffer) in the app's output folder. The chat shows it as a download.
+  - savePdf(fileName, html): turns an HTML page into a PDF in the output folder, using the Chrome or Edge browser on this laptop. Use print-friendly CSS (A4, @page margins).
+  - The app has a resources folder for files tools use: templates, price lists, logos, reference data. Sub-folders are allowed.
+  - readResource(path): reads a resource as text, for example readResource("price-list.csv"). readResource(path, null) gives the raw bytes.
+  - listResources(): lists all resource files, for example ["logo.png", "templates/invoice.html"].
+  - resourceDataUrl(path): turns a resource such as a logo into a data: link to use inside HTML or a PDF, for example <img src="${resourceDataUrl("logo.png")}">.
+  - readTemplate(fileName): reads a template from resources/templates, for example readTemplate("invoice.html").
+  - fillTemplate(text, values): fills a template. {{name}} becomes the value (made safe for HTML), {{{name}}} inserts ready-made HTML, and {{#each lines}}...{{/each}} repeats a part for every item in a list (inside it, {{description}} reads from the item and {{@number}} counts 1, 2, 3).
+  - resources/templates has invoice.html, a ready-made invoice design. Pass these values: business_name, business_address, business_kvk, business_btw, business_iban, invoice_number, invoice_date, due_date, reference, client_name, client_address, client_email, lines (a list of { description, qty, price, btw, amount }), subtotal, btw_rows (a list of { rate, base, amount }), total, payment_note, and optionally logo (an <img> tag) or logo_letter. Format money as text like "€ 4,20".
+  - getJSON(url, options): fetch JSON from a web service.
+  - require: Node.js built-in modules, for example require("fs") or require("path"). Do not use npm packages that need installing.
+- fetch is available for web requests. Prefer free services. If a service needs a key, add its name to needs and tell me which key to add.
+- If something goes wrong, return { error: "a short explanation" } instead of throwing an error.
+- Keep it short and readable, with a few comments for a beginner.
+- Reply with only the code, no explanation before or after it.
+
+My tool idea:
+[DESCRIBE YOUR TOOL HERE, for example: "Make a polite payment reminder email for an overdue invoice. Inputs: customer name, invoice number, amount, days overdue, and language (Dutch or English)."]

@@ -1,0 +1,13 @@
+AGENT CHAT: START HERE
+
+1. Unzip this folder first (do not run anything from inside the zip).
+2. Mac: double-click "Start Agent Chat (Mac).command".
+   If your Mac says it cannot check the file: right-click it, choose Open, then Open again.
+   Windows: double-click "Start Agent Chat (Windows).bat".
+   If Windows says it protected your PC: click "More info", then "Run anyway".
+3. The first start can take a minute: it may download Node.js into this folder. Nothing is installed elsewhere.
+4. Your browser opens Agent Chat. Go to Settings, paste your free AI key and click Save.
+5. Keep the black window open while you use Agent Chat. Close it to stop.
+
+Stuck? Read docs/troubleshooting.md, or use the browser-only version in the fallback folder.
+More information: README.md

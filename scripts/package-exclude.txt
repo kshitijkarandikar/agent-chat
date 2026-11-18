@@ -1,0 +1,5 @@
+# Files that stay out of the attendee zip (one pattern per line, relative to agent-chat/).
+# Your own experiments go here so attendees get a clean starter set.
+tools/generate_invoice.js
+tools/_check.js
+tools/find_restaurants.js

@@ -1,0 +1,7 @@
+.env
+.runtime/
+node_modules/
+output/*
+!output/.gitkeep
+agent.json
+.DS_Store

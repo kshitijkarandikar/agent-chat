@@ -1,0 +1,187 @@
+<!doctype html>
+<!--
+  Invoice template for Agent Chat tools. Lives in resources/templates.
+  Use it in a tool with:  const html = fillTemplate(readTemplate("invoice.html"), values);  savePdf("invoice-2026-001.pdf", html);
+
+  Placeholders: {{name}} = plain text, {{{name}}} = ready-made HTML, {{#each list}} ... {{/each}} = repeat for every item.
+    {{business_name}}      {{business_address}}   {{business_kvk}}   {{business_btw}}   {{business_iban}}
+    {{invoice_number}}     {{invoice_date}}       {{due_date}}       {{reference}}
+    {{client_name}}        {{client_address}}     {{client_email}}
+    lines                  a list of line items, one table row each. Every item has:
+                             description   for example Sourdough loaf
+                             qty           for example 40
+                             price         for example € 4,20
+                             btw           for example 9%
+                             amount        for example € 168,00   (qty times price, excluding BTW)
+                           Example value: [{ description: "Sourdough loaf", qty: 40, price: "€ 4,20", btw: "9%", amount: "€ 168,00" }]
+    {{subtotal}}           for example € 333,50
+    btw_rows               a list with one item per BTW rate. Every item has:
+                             rate          for example 9%
+                             base          the amount the rate applies to, for example € 321,00
+                             amount        the BTW, for example € 28,89
+                           Example value: [{ rate: "9%", base: "€ 321,00", amount: "€ 28,89" }]
+    {{total}}              for example € 365,02
+    {{payment_note}}       for example: Please pay before the due date, quoting the invoice number.
+    {{{logo}}}             optional: an <img> tag, for example <img src="${resourceDataUrl("logo.png")}" alt="">. Leave empty for a letter logo.
+    {{logo_letter}}        optional: the letter shown when there is no logo, for example K
+
+  Make it your own: change the colours in :root below (--accent is the main colour).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Invoice {{invoice_number}}</title>
+<style>
+  @page { size: A4; margin: 0; }
+  :root {
+    --accent: #b04e1e;        /* main colour */
+    --accent-dark: #7e3713;
+    --accent-soft: #fbeee6;
+    --ink: #2a2118;
+    --muted: #75685d;
+    --line: #eadfd4;
+    --paper: #ffffff;
+    --tint: #fbf7f2;
+  }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { margin: 0; background: var(--paper); }
+  body { color: var(--ink); font: 10pt/1.5 "Helvetica Neue", "Segoe UI", Arial, sans-serif; }
+  .page { min-height: 296mm; display: flex; flex-direction: column; }
+
+  /* Header band */
+  .band { background: var(--accent); color: #fff; padding: 12mm 16mm 10mm; display: flex; justify-content: space-between; align-items: flex-start; gap: 10mm; position: relative; overflow: hidden; }
+  .band::after { content: ""; position: absolute; right: -30mm; top: -30mm; width: 90mm; height: 90mm; border-radius: 50%; background: rgba(255,255,255,.08); }
+  .brand { display: flex; gap: 5mm; align-items: center; position: relative; z-index: 1; }
+  .logo { width: 16mm; height: 16mm; border-radius: 4mm; background: #fff; color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 20pt; font-weight: 800; overflow: hidden; flex: none; }
+  .logo img { width: 100%; height: 100%; object-fit: contain; }
+  .logo .letter:empty::before { content: "★"; }
+  .brand-name { font-size: 17pt; font-weight: 700; letter-spacing: .01em; }
+  .brand-address { font-size: 9pt; opacity: .85; white-space: pre-line; margin-top: 1mm; }
+  .doc { text-align: right; position: relative; z-index: 1; }
+  .doc-word { font-size: 26pt; font-weight: 300; letter-spacing: .18em; line-height: 1; }
+  .doc-number { margin-top: 3mm; font-size: 10pt; background: rgba(255,255,255,.16); border-radius: 99px; padding: 1.2mm 4mm; display: inline-block; }
+
+  .content { padding: 8mm 16mm 0; flex: 1; }
+
+  /* Key facts */
+  .facts { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 4mm; margin-bottom: 7mm; }
+  .fact { background: var(--tint); border: 1px solid var(--line); border-radius: 3mm; padding: 3.5mm 4mm; }
+  .fact .k { font-size: 7.5pt; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+  .fact .v { font-size: 11pt; font-weight: 600; margin-top: .5mm; }
+  .fact.due { background: var(--accent-soft); border-color: transparent; }
+  .fact.due .v { font-size: 16pt; font-weight: 800; color: var(--accent-dark); }
+
+  /* Parties */
+  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; margin-bottom: 7mm; }
+  h2 { font-size: 7.5pt; text-transform: uppercase; letter-spacing: .12em; color: var(--accent); margin: 0 0 1.5mm; }
+  .party-name { font-weight: 700; font-size: 11pt; }
+  .pre { white-space: pre-line; color: var(--ink); }
+  .muted { color: var(--muted); }
+
+  /* Lines */
+  table { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--line); border-radius: 3mm; overflow: hidden; }
+  thead th { background: var(--ink); color: #fff; text-align: left; font-size: 7.5pt; text-transform: uppercase; letter-spacing: .1em; font-weight: 600; padding: 3mm 4mm; }
+  tbody td { padding: 2.6mm 4mm; border-top: 1px solid var(--line); }
+  tbody tr:first-child td { border-top: none; }
+  tbody tr:nth-child(even) td { background: var(--tint); }
+  .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  /* Totals */
+  .totals { width: 78mm; margin: 5mm 0 0 auto; break-inside: avoid; }
+  .sum { display: flex; justify-content: space-between; padding: 1.5mm 4mm; font-variant-numeric: tabular-nums; }
+  .grand { margin-top: 2mm; background: var(--accent); color: #fff; border-radius: 3mm; padding: 3.5mm 4mm; font-size: 13pt; font-weight: 800; }
+
+  /* Payment */
+  .pay { margin-top: 8mm; break-inside: avoid; display: grid; grid-template-columns: 1.4fr 1fr; gap: 6mm; align-items: stretch; }
+  .pay-box { border: 1.5px dashed var(--accent); border-radius: 3mm; padding: 4mm 5mm; }
+  .pay-box .row { display: flex; justify-content: space-between; gap: 4mm; padding: .8mm 0; }
+  .pay-box .row span:first-child { color: var(--muted); }
+  .pay-box .row span:last-child { font-weight: 600; text-align: right; }
+  .note { background: var(--tint); border-radius: 3mm; padding: 4mm 5mm; color: var(--muted); }
+  .thanks { margin-top: 2mm; font-weight: 700; color: var(--accent-dark); }
+
+  /* Footer */
+  .foot { margin-top: 8mm; padding: 4mm 16mm 7mm; break-inside: avoid; border-top: 3px solid var(--accent); color: var(--muted); font-size: 8pt; display: flex; gap: 8mm; flex-wrap: wrap; justify-content: space-between; }
+  .foot b { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="band">
+    <div class="brand">
+      <div class="logo">{{{logo}}}<span class="letter">{{logo_letter}}</span></div>
+      <div>
+        <div class="brand-name">{{business_name}}</div>
+        <div class="brand-address">{{business_address}}</div>
+      </div>
+    </div>
+    <div class="doc">
+      <div class="doc-word">INVOICE</div>
+      <div class="doc-number">No. {{invoice_number}}</div>
+    </div>
+  </header>
+
+  <main class="content">
+    <section class="facts">
+      <div class="fact"><div class="k">Invoice date</div><div class="v">{{invoice_date}}</div></div>
+      <div class="fact"><div class="k">Due date</div><div class="v">{{due_date}}</div></div>
+      <div class="fact due"><div class="k">Amount due</div><div class="v">{{total}}</div></div>
+    </section>
+
+    <section class="parties">
+      <div>
+        <h2>Bill to</h2>
+        <div class="party-name">{{client_name}}</div>
+        <div class="pre">{{client_address}}</div>
+        <div class="muted">{{client_email}}</div>
+      </div>
+      <div>
+        <h2>Reference</h2>
+        <div>{{reference}}</div>
+      </div>
+    </section>
+
+    <table>
+      <thead>
+        <tr><th>Description</th><th class="num">Qty</th><th class="num">Price</th><th class="num">BTW</th><th class="num">Total</th></tr>
+      </thead>
+      <tbody>
+        {{#each lines}}
+        <tr><td>{{description}}</td><td class="num">{{qty}}</td><td class="num">{{price}}</td><td class="num">{{btw}}</td><td class="num">{{amount}}</td></tr>
+        {{/each}}
+      </tbody>
+    </table>
+
+    <section class="totals">
+      <div class="sum"><span>Subtotal (excl. BTW)</span><span>{{subtotal}}</span></div>
+      {{#each btw_rows}}
+      <div class="sum"><span>BTW {{rate}} over {{base}}</span><span>{{amount}}</span></div>
+      {{/each}}
+      <div class="sum grand"><span>Total</span><span>{{total}}</span></div>
+    </section>
+
+    <section class="pay">
+      <div class="pay-box">
+        <h2>How to pay</h2>
+        <div class="row"><span>Amount</span><span>{{total}}</span></div>
+        <div class="row"><span>To IBAN</span><span>{{business_iban}}</span></div>
+        <div class="row"><span>In the name of</span><span>{{business_name}}</span></div>
+        <div class="row"><span>Pay before</span><span>{{due_date}}</span></div>
+        <div class="row"><span>Mention</span><span>Invoice {{invoice_number}}</span></div>
+      </div>
+      <div class="note">
+        {{payment_note}}
+        <div class="thanks">Thank you for your order!</div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span><b>{{business_name}}</b></span>
+    <span>KvK <b>{{business_kvk}}</b></span>
+    <span>BTW <b>{{business_btw}}</b></span>
+    <span>IBAN <b>{{business_iban}}</b></span>
+  </footer>
+</div>
+</body>
+</html>
